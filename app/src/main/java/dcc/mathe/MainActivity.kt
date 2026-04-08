@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// Dátové modely
 data class ChybnyPriklad(val c1: Int, val c2: Int)
 data class ZaznamKola(val poradie: Int, val spravne: Int, val celkovo: Int, val casSekundy: Double)
 
@@ -49,12 +50,13 @@ class MainActivity : ComponentActivity() {
 fun MatematickyTrener() {
     val historiaKol = remember { mutableStateListOf<ZaznamKola>() }
     
-    // Nastavenia - hornaHranicaNasobilky je teraz na zaciatku prazdna
+    // Nastavenia
     var hraBezi by remember { mutableStateOf(false) }
     var limitPrikladov by remember { mutableIntStateOf(5) }
     var hornaHranicaNasobilky by remember { mutableStateOf("") } 
     var zvolenyJazyk by remember { mutableStateOf("Slovenčina") }
     
+    // Stav kola
     var cislo1 by remember { mutableIntStateOf(1) }
     var cislo2 by remember { mutableIntStateOf(1) }
     var vstupPouzivatela by remember { mutableStateOf("") }
@@ -62,6 +64,7 @@ fun MatematickyTrener() {
     var spravneOdpovede by remember { mutableIntStateOf(0) }
     val chybnePriklady = remember { mutableStateListOf<ChybnyPriklad>() }
     
+    // Časomiera
     var startTimeCelkovo by remember { mutableLongStateOf(0L) }
     var startTimePriklad by remember { mutableLongStateOf(0L) }
     var aktualneSekundy by remember { mutableIntStateOf(0) }
@@ -72,10 +75,22 @@ fun MatematickyTrener() {
     val animovanaFarba by animateColorAsState(targetValue = farbaPozadia, label = "")
     val scope = rememberCoroutineScope()
 
+    // --- POMOCNÉ FUNKCIE ---
+
     fun generujPriklad() {
         val max = hornaHranicaNasobilky.toIntOrNull()?.coerceIn(1, 20) ?: 10
         cislo1 = (1..max).random()
         cislo2 = (1..max).random()
+    }
+
+    fun resetujHru() {
+        pocetPrikladov = 0
+        spravneOdpovede = 0
+        vstupPouzivatela = ""
+        aktualneSekundy = 0
+        chybnePriklady.clear()
+        zobrazVysledok = false
+        hraBezi = false
     }
 
     fun startNovehoKola() {
@@ -88,21 +103,12 @@ fun MatematickyTrener() {
         hraBezi = true
         generujPriklad()
         startTimeCelkovo = System.currentTimeMillis()
+        startTimePriklad = System.currentTimeMillis()
     }
 
     fun resetDoMenu() {
-        resetujHru() // Vyčistí stav kola
-        hornaHranicaNasobilky = "" // Vyčistí aj nastavenie
-    }
-
-    fun resetujHru() {
-        pocetPrikladov = 0
-        spravneOdpovede = 0
-        vstupPouzivatela = ""
-        aktualneSekundy = 0
-        chybnePriklady.clear()
-        zobrazVysledok = false
-        hraBezi = false
+        resetujHru()
+        hornaHranicaNasobilky = "" 
     }
 
     fun spracujOdpoved(hodnota: String) {
@@ -129,6 +135,7 @@ fun MatematickyTrener() {
         }
     }
 
+    // --- HLASOVÉ OVLÁDANIE ---
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK) {
             val data = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
@@ -150,6 +157,7 @@ fun MatematickyTrener() {
         }
     }
 
+    // --- POUŽÍVATEĽSKÉ ROZHRANIE ---
     when {
         !hraBezi -> {
             Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -178,7 +186,7 @@ fun MatematickyTrener() {
                 }
 
                 Spacer(Modifier.height(16.dp))
-                Text("Jazyk:")
+                Text("Jazyk pre hlas:")
                 Row {
                     listOf("Slovenčina", "Deutsch").forEach { jaz ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.selectable(jaz == zvolenyJazyk, onClick = { zvolenyJazyk = jaz }).padding(8.dp)) {
@@ -203,9 +211,7 @@ fun MatematickyTrener() {
                     onClick = { startNovehoKola() }, 
                     enabled = hornaHranicaNasobilky.isNotEmpty() && (hornaHranicaNasobilky.toIntOrNull() ?: 0) > 0,
                     modifier = Modifier.fillMaxWidth().height(60.dp)
-                ) { 
-                    Text("ŠTART") 
-                }
+                ) { Text("ŠTART") }
             }
         }
 
@@ -215,8 +221,8 @@ fun MatematickyTrener() {
                 celkovo = limitPrikladov, 
                 cas = celkovyCas, 
                 chybne = chybnePriklady,
-                onRetry = { startNovehoKola() }, // Rovnaké parametre
-                onMenu = { resetDoMenu() } // Úplný reštart
+                onRetry = { startNovehoKola() },
+                onMenu = { resetDoMenu() }
             )
         }
 
@@ -273,8 +279,8 @@ fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyP
         }
 
         Spacer(Modifier.height(8.dp))
-        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("HRAŤ ZNOVU (Rovnaké nastavenia)") }
-        OutlinedButton(onClick = onMenu, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("HLAVNÉ MENU (Nové nastavenia)") }
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("HRAŤ ZNOVU") }
+        OutlinedButton(onClick = onMenu, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("MENU") }
     }
 }
 
