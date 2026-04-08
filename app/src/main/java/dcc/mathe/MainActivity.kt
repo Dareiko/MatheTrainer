@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,14 +25,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+// 1. Rozšírený dátový model
 data class ChybnyPriklad(val c1: Int, val c2: Int)
-data class ZaznamKola(val id: Long, val poradie: Int, val spravne: Int, val celkovo: Int, val casSekundy: Double)
+data class ZaznamKola(
+    val id: Long, 
+    val poradie: Int, 
+    val typX: String, 
+    val spravne: Int, 
+    val celkovo: Int, 
+    val casSekundy: Double
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,22 +67,22 @@ fun MatematickyTrener() {
         if (zvolenyJazyk == "Slovenčina") {
             mapOf(
                 "title" to "Mathe Trainer", "limitX" to "Násobilka do:", "limitP" to "Počet príkladov:",
-                "lang" to "Jazyk:", "start" to "ŠTART", "history" to "Dnešná história:",
+                "lang" to "Jazyk:", "start" to "ŠTART", "history" to "História výsledkov:",
                 "round" to "Kolo", "example" to "Príklad", "time" to "Čas", "answer" to "Odpoveď",
                 "confirm" to "POTVRDIŤ", "results" to "📊 Výsledky", "success" to "Úspešnosť",
-                "totalTime" to "Celkový čas", "average" to "Priemer na príklad", "correction" to "Oprava chýb:", 
+                "totalTime" to "Celkový čas", "average" to "Priemer", "correction" to "Oprava:", 
                 "perfect" to "Perfektné! 🏆", "retry" to "ZNOVA", "menu" to "MENU", 
-                "wrong" to "Nesprávne! Oprav:", "skip" to "PRESKOČIŤ"
+                "wrong" to "Nesprávne! Oprav:", "skip" to "PRESKOČIŤ", "type" to "Typ"
             )
         } else {
             mapOf(
                 "title" to "Mathe Trainer", "limitX" to "Einmaleins bis:", "limitP" to "Anzahl der Aufgaben:",
-                "lang" to "Sprache:", "start" to "START", "history" to "Heutiger Verlauf:",
+                "lang" to "Sprache:", "start" to "START", "history" to "Ergebnisverlauf:",
                 "round" to "Runde", "example" to "Aufgabe", "time" to "Zeit", "answer" to "Antwort",
                 "confirm" to "BESTÄTIGEN", "results" to "📊 Ergebnisse", "success" to "Erfolg",
-                "totalTime" to "Gesamtzeit", "average" to "Schnitt pro Aufgabe", "correction" to "Fehlerkorrektur:", 
+                "totalTime" to "Gesamtzeit", "average" to "Schnitt", "correction" to "Korrektur:", 
                 "perfect" to "Perfekt! 🏆", "retry" to "WIEDERHOLEN", "menu" to "MENÜ", 
-                "wrong" to "Falsch! Korrigiere:", "skip" to "ÜBERSPRINGEN"
+                "wrong" to "Falsch! Korrigiere:", "skip" to "ÜBERSPRINGEN", "type" to "Typ"
             )
         }
     }
@@ -134,7 +144,7 @@ fun MatematickyTrener() {
                     startTimePriklad = System.currentTimeMillis()
                 } else {
                     celkovyCas = System.currentTimeMillis() - startTimeCelkovo
-                    historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size + 1, spravneOdpovede, limitPrikladov, celkovyCas / 1000.0))
+                    historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size + 1, hornaHranicaNasobilky, spravneOdpovede, limitPrikladov, celkovyCas / 1000.0))
                     zobrazVysledok = true
                 }
             } else {
@@ -170,58 +180,89 @@ fun MatematickyTrener() {
 
     when {
         !hraBezi -> {
-            Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(t["title"]!!, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(20.dp))
+
+                // Násobilka do (Upravené 10-20 po 1)
                 Text(t["limitX"]!!)
                 ExposedDropdownMenuBox(expanded = expandedX, onExpandedChange = { expandedX = !expandedX }) {
                     OutlinedTextField(
                         value = hornaHranicaNasobilky, onValueChange = {}, readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedX) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(0.6f)
+                        modifier = Modifier.menuAnchor().fillMaxWidth(0.5f)
                     )
                     ExposedDropdownMenu(expanded = expandedX, onDismissRequest = { expandedX = false }) {
-                        (1..20).forEach { i -> DropdownMenuItem(text = { Text(i.toString()) }, onClick = { hornaHranicaNasobilky = i.toString(); expandedX = false }) }
+                        (10..20).forEach { i -> 
+                            DropdownMenuItem(text = { Text(i.toString()) }, onClick = { hornaHranicaNasobilky = i.toString(); expandedX = false }) 
+                        }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+
+                Spacer(Modifier.height(12.dp))
                 Text(t["limitP"]!!)
                 ExposedDropdownMenuBox(expanded = expandedPocet, onExpandedChange = { expandedPocet = !expandedPocet }) {
                     OutlinedTextField(
                         value = limitPrikladov.toString(), onValueChange = {}, readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPocet) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(0.6f)
+                        modifier = Modifier.menuAnchor().fillMaxWidth(0.5f)
                     )
                     ExposedDropdownMenu(expanded = expandedPocet, onDismissRequest = { expandedPocet = false }) {
                         listOf(5, 10, 15, 20, 30).forEach { p -> DropdownMenuItem(text = { Text(p.toString()) }, onClick = { limitPrikladov = p; expandedPocet = false }) }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+
+                Spacer(Modifier.height(12.dp))
                 Text(t["lang"]!!)
                 Row {
                     listOf("Slovenčina", "Deutsch").forEach { jaz ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
                             RadioButton(jaz == zvolenyJazyk, onClick = { zvolenyJazyk = jaz })
-                            Text(jaz)
+                            Text(jaz, fontSize = 14.sp)
                         }
                     }
                 }
+
+                // TABUĽKA ŠTATISTÍK
                 if (historiaKol.isNotEmpty()) {
                     Spacer(Modifier.height(16.dp))
                     Text(t["history"]!!, fontWeight = FontWeight.SemiBold)
-                    LazyColumn(modifier = Modifier.height(120.dp)) {
-                        items(historiaKol.reversed(), key = { it.id }) { 
-                            Text("${t["round"]} ${it.poradie}: ${it.spravne}/${it.celkovo} (${"%.1f".format(it.casSekundy)}s)", fontSize = 14.sp) 
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // Hlavička tabuľky
+                    Row(Modifier.fillMaxWidth().background(Color.LightGray).padding(4.dp)) {
+                        Text(t["type"]!!, Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        Text("N", Modifier.weight(0.8f), fontWeight = FontWeight.Bold, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        Text(t["time"]!!, Modifier.weight(1.5f), fontWeight = FontWeight.Bold, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        Text("%", Modifier.weight(0.8f), fontWeight = FontWeight.Bold, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        Text("OK", Modifier.weight(0.8f), fontWeight = FontWeight.Bold, fontSize = 10.sp, textAlign = TextAlign.Center)
+                    }
+
+                    LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().border(1.dp, Color.Gray)) {
+                        items(historiaKol.reversed(), key = { it.id }) { k ->
+                            val uspesnost = (k.spravne.toDouble() / k.celkovo * 100).toInt()
+                            val priemer = k.casSekundy / k.celkovo
+                            Row(Modifier.fillMaxWidth().padding(4.dp).border(0.5.dp, Color.LightGray)) {
+                                Text("1-${k.typX}", Modifier.weight(1f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                                Text("${k.celkovo}", Modifier.weight(0.8f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                                Text("${"%.1f".format(k.casSekundy)}s (${"%.1f".format(priemer)}s)", Modifier.weight(1.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                                Text("$uspesnost%", Modifier.weight(0.8f), fontSize = 11.sp, textAlign = TextAlign.Center, color = if(uspesnost < 50) Color.Red else Color.Unspecified)
+                                Text("${k.spravne}", Modifier.weight(0.8f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            }
                         }
                     }
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
-                Spacer(Modifier.weight(1f))
-                Button(onClick = { startNovehoKola() }, modifier = Modifier.fillMaxWidth().height(64.dp)) { Text(t["start"]!!) }
+
+                Button(onClick = { startNovehoKola() }, modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 8.dp)) { Text(t["start"]!!) }
             }
         }
+
         zobrazVysledok -> {
             StatistikaScreen(spravneOdpovede, limitPrikladov, celkovyCas, chybnePriklady, t, { startNovehoKola() }, { hraBezi = false; zobrazVysledok = false })
         }
+
         else -> {
             Column(modifier = Modifier.fillMaxSize().background(animovanaFarba).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("${t["example"]} ${pocetPrikladov + 1} / $limitPrikladov")
@@ -250,7 +291,7 @@ fun MatematickyTrener() {
                 )
                 if (rezimOpravy) {
                     Row(modifier = Modifier.padding(top = 24.dp).fillMaxWidth()) {
-                        OutlinedButton(onClick = { chybnePriklady.add(ChybnyPriklad(cislo1, cislo2)); scope.launch { if (pocetPrikladov < limitPrikladov - 1) { pocetPrikladov++; generujPriklad(); vstupPouzivatela = ""; rezimOpravy = false; startTimePriklad = System.currentTimeMillis() } else { celkovyCas = System.currentTimeMillis() - startTimeCelkovo; historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size + 1, spravneOdpovede, limitPrikladov, celkovyCas / 1000.0)); zobrazVysledok = true } } }, modifier = Modifier.weight(1f).height(56.dp)) { Icon(Icons.Default.SkipNext, null); Spacer(Modifier.width(8.dp)); Text(t["skip"]!!) }
+                        OutlinedButton(onClick = { chybnePriklady.add(ChybnyPriklad(cislo1, cislo2)); scope.launch { if (pocetPrikladov < limitPrikladov - 1) { pocetPrikladov++; generujPriklad(); vstupPouzivatela = ""; rezimOpravy = false; startTimePriklad = System.currentTimeMillis() } else { celkovyCas = System.currentTimeMillis() - startTimeCelkovo; historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size + 1, hornaHranicaNasobilky, spravneOdpovede, limitPrikladov, celkovyCas / 1000.0)); zobrazVysledok = true } } }, modifier = Modifier.weight(1f).height(56.dp)) { Icon(Icons.Default.SkipNext, null); Spacer(Modifier.width(8.dp)); Text(t["skip"]!!) }
                         Button(onClick = { spracujOdpoved(vstupPouzivatela) }, modifier = Modifier.weight(1f).padding(start = 8.dp).height(56.dp)) { Text(t["confirm"]!!) }
                     }
                 } else {
