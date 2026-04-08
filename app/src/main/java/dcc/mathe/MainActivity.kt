@@ -44,7 +44,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-data class ChybnyPriklad(val c1: Int, val c2: Int)
 data class ZaznamKola(val id: Long, val poradie: Int, val typX: String, val spravne: Int, val celkovo: Int, val casSekundy: Double)
 
 class MainActivity : ComponentActivity() {
@@ -124,13 +123,13 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         if (jazyk == "Slovenčina") mapOf(
             "title" to "Mathe Trainer", "start" to "ŠTART", "history" to "História",
             "example" to "Príklad", "results" to "📊 Výsledky", "success" to "Úspešnosť",
-            "menu" to "MENU", "exit" to "Koniec", "limitX" to "Násobilka do:", "limitP" to "Počet príkladov:",
-            "count" to "Počet", "time" to "Čas (Priem.)", "none" to "Žiadne záznamy"
+            "menu" to "MENU", "exit" to "Koniec", "limitX" to "Násobilka do:", "limitP" to "Počet:",
+            "count" to "Počet", "time" to "Čas (Priem.)", "none" to "Žiadne záznamy", "theme" to "Téma"
         ) else mapOf(
             "title" to "Mathe Trainer", "start" to "START", "history" to "Verlauf",
             "example" to "Aufgabe", "results" to "📊 Ergebnisse", "success" to "Erfolg",
-            "menu" to "MENÜ", "exit" to "Ende", "limitX" to "Einmaleins bis:", "limitP" to "Anzahl:",
-            "count" to "Anzahl", "time" to "Zeit (Schnitt)", "none" to "Keine Daten"
+            "menu" to "MENÜ", "exit" to "Ende", "limitX" to "Einmaleins do:", "limitP" to "Anzahl:",
+            "count" to "Anzahl", "time" to "Zeit (Schnitt)", "none" to "Keine Daten", "theme" to "Modus"
         )
     }
 
@@ -148,19 +147,24 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
     var bgFarba by remember { mutableStateOf(Color.Transparent) }
     val animBg by animateColorAsState(bgFarba, label = "bg")
 
+    // --- LOGIKA GENERÁTORA (Vylepšená na Hard Mode) ---
     val generuj = {
         val max = typX.toIntOrNull() ?: 10
         fun dajV(l: Int): Int {
             val ls = mutableListOf<Int>()
             for (i in 1..l) {
-                val v = when(i) { 1 -> 1; 2, 5, 10 -> 2; in 6..9 -> 4; else -> 3 }
+                val v = when(i) {
+                    1, 2 -> 0   // ELIMINÁCIA 1 a 2
+                    10 -> 1     // Nízka šanca pre 10
+                    in 6..9 -> 5 // Vysoká šanca pre 6-9
+                    else -> 3
+                }
                 repeat(v) { ls.add(i) }
             }
-            return ls.random()
+            // Ak by bol zoznam prázdny (napr. pri limite 2), vrátime aspoň niečo
+            return if (ls.isEmpty()) (1..l).random() else ls.random()
         }
-        var a = dajV(max); var b = dajV(max)
-        if (a < 3 && b < 3) { if ((0..1).random() == 0) a = (3..max).random() else b = (3..max).random() }
-        n1 = a; n2 = b
+        n1 = dajV(max); n2 = dajV(max)
     }
 
     fun potvrd(valStr: String) {
@@ -172,7 +176,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                 body++
                 delay(300); bgFarba = Color.Transparent
                 if (aktualnyIndex < limit - 1) {
-                    aktualnyIndex++; generuj(); vstup = ""
+                    aktualnyIndex++; generuj(); vstup = "" // RESET VSTUPU
                 } else {
                     historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size+1, typX, body, limit, (System.currentTimeMillis() - startT)/1000.0))
                     zobrazVysledok = true
@@ -180,7 +184,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
             } else {
                 safeVibrate(context, false)
                 bgFarba = Color(0xFFFFCDD2).copy(alpha = 0.5f)
-                delay(300); bgFarba = Color.Transparent; vstup = ""
+                delay(300); bgFarba = Color.Transparent; vstup = "" // RESET VSTUPU
             }
         }
     }
@@ -208,7 +212,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         drawerContent = {
             ModalDrawerSheet(modifier = Modifier.fillMaxWidth(0.85f)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text(t["history"] ?: "História", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text(t["history"]!!, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     TrendovyGraf(historiaKol, isSystemInDarkTheme() || themeMode == "dark")
                     
                     if (historiaKol.isNotEmpty()) {
@@ -222,23 +226,24 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                             items(historiaKol.reversed(), key = { it.id }) { k ->
                                 val u = (k.spravne.toDouble() / k.celkovo * 100).toInt()
-                                val avg = k.casSekundy / k.celkovo
                                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).border(0.5.dp, Color.Gray.copy(0.3f))) {
                                     Text("1-${k.typX}", Modifier.weight(0.8f), fontSize = 10.sp, textAlign = TextAlign.Center)
                                     Text("${k.celkovo}", Modifier.weight(0.8f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                                    Text("${"%.1f".format(k.casSekundy)}s (${"%.1f".format(avg)}s)", Modifier.weight(1.6f), fontSize = 9.sp, textAlign = TextAlign.Center)
+                                    Text("${"%.1f".format(k.casSekundy)}s (${"%.1f".format(k.casSekundy/k.celkovo)}s)", Modifier.weight(1.6f), fontSize = 9.sp, textAlign = TextAlign.Center)
                                     Text("$u%", Modifier.weight(0.7f), fontSize = 10.sp, textAlign = TextAlign.Center, color = if (u < 50) Color.Red else MaterialTheme.colorScheme.primary)
                                     Text("${k.spravne}", Modifier.weight(0.6f), fontSize = 10.sp, textAlign = TextAlign.Center)
                                 }
                             }
                         }
-                    } else {
-                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(t["none"]!!, modifier = Modifier.alpha(0.5f)) }
-                    }
+                    } else { Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(t["none"]!!, modifier = Modifier.alpha(0.5f)) } }
                     
                     Divider(Modifier.padding(vertical = 8.dp))
                     NavigationDrawerItem(label={Text("Jazyk: $jazyk")}, selected=false, onClick={jazyk = if(jazyk=="Slovenčina") "Deutsch" else "Slovenčina"})
-                    NavigationDrawerItem(label={Text("Téma: $themeMode")}, selected=false, onClick={onThemeToggle(if(themeMode=="light") "dark" else "light")})
+                    // TÉMA CYKLOVANIE: system -> light -> dark
+                    NavigationDrawerItem(label={Text(t["theme"]!! + ": ${themeMode.uppercase()}")}, selected=false, onClick={
+                        val next = when(themeMode) { "system" -> "light"; "light" -> "dark"; else -> "system" }
+                        onThemeToggle(next)
+                    })
                     NavigationDrawerItem(label={Text(t["exit"]!!)}, selected=false, onClick={(context as? ComponentActivity)?.finish()})
                 }
             }
@@ -252,11 +257,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                 )
             },
             bottomBar = {
-                Text(
-                    "DCC, všetky práva vyhradené, 2026",
-                    Modifier.fillMaxWidth().padding(8.dp).alpha(0.5f),
-                    fontSize = 10.sp, textAlign = TextAlign.Center
-                )
+                Text("DCC, všetky práva vyhradené, 2026", Modifier.fillMaxWidth().padding(8.dp).alpha(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
             }
         ) { p ->
             Box(Modifier.fillMaxSize().padding(p)) {
@@ -271,7 +272,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
 
                         Text(t["limitX"]!!)
                         ExposedDropdownMenuBox(exX, { exX = !exX }) {
-                            OutlinedTextField(value = typX, onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = exX) }, modifier = Modifier.menuAnchor().width(180.dp))
+                            OutlinedTextField(value = typX, onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(exX) }, modifier = Modifier.menuAnchor().width(180.dp))
                             ExposedDropdownMenu(exX, { exX = false }) {
                                 (10..20).forEach { i -> DropdownMenuItem(text = { Text(i.toString()) }, onClick = { typX = i.toString(); exX = false }) }
                             }
@@ -279,13 +280,13 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                         Spacer(Modifier.height(16.dp))
                         Text(t["limitP"]!!)
                         ExposedDropdownMenuBox(exP, { exP = !exP }) {
-                            OutlinedTextField(value = limit.toString(), onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = exP) }, modifier = Modifier.menuAnchor().width(180.dp))
+                            OutlinedTextField(value = limit.toString(), onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(exP) }, modifier = Modifier.menuAnchor().width(180.dp))
                             ExposedDropdownMenu(exP, { exP = false }) {
                                 listOf(5, 10, 15, 20, 30).forEach { i -> DropdownMenuItem(text = { Text(i.toString()) }, onClick = { limit = i; exP = false }) }
                             }
                         }
                         Spacer(Modifier.height(32.dp))
-                        Button({ startT = System.currentTimeMillis(); sekundy = 0; body = 0; aktualnyIndex = 0; hraBezi = true; generuj() }, Modifier.fillMaxWidth().height(60.dp)) { Text(t["start"]!!, fontSize = 18.sp) }
+                        Button({ startT = System.currentTimeMillis(); sekundy = 0; body = 0; aktualnyIndex = 0; vstup = ""; hraBezi = true; generuj() }, Modifier.fillMaxWidth().height(60.dp)) { Text(t["start"]!!, fontSize = 18.sp) }
                     }
                     zobrazVysledok -> Column(
                         modifier = Modifier.fillMaxSize().padding(20.dp),
