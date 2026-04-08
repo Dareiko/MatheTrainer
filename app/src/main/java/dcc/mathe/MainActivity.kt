@@ -27,11 +27,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-// Modely dát
+// Modely dát zostávajú nezmenené
 data class ChybnyPriklad(val c1: Int, val c2: Int)
-data class ZaznamKola(val poradie: Int, val spravne: Int, val celkovo: Int, val casSekundy: Double)
+data class ZaznamKola(val id: Long, val poradie: Int, val spravne: Int, val celkovo: Int, val casSekundy: Double)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,67 +51,42 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MatematickyTrener() {
     val historiaKol = remember { mutableStateListOf<ZaznamKola>() }
+    val scope = rememberCoroutineScope()
     
-    // Jazykové nastavenia a texty
+    // 1. LOKALIZÁCIA (Optimalizovaná pomocou remember)
     var zvolenyJazyk by remember { mutableStateOf("Slovenčina") }
     val t = remember(zvolenyJazyk) {
         if (zvolenyJazyk == "Slovenčina") {
             mapOf(
-                "title" to "Mathe Trainer v0.42",
-                "limitX" to "Násobilka do:",
-                "limitP" to "Počet príkladov:",
-                "lang" to "Jazyk:",
-                "start" to "ŠTART",
-                "history" to "Dnešná história:",
-                "round" to "Kolo",
-                "example" to "Príklad",
-                "time" to "Čas",
-                "answer" to "Odpoveď",
-                "confirm" to "POTVRDIŤ",
-                "results" to "📊 Výsledky",
-                "success" to "Úspešnosť",
-                "totalTime" to "Celkový čas",
-                "correction" to "Oprava chýb na konci:",
-                "perfect" to "Perfektné! 🏆",
-                "retry" to "ZNOVA",
-                "menu" to "MENU",
-                "wrong" to "Nespravne! Oprav:",
-                "skip" to "PRESKOČIŤ"
+                "title" to "Mathe Trainer", "limitX" to "Násobilka do:", "limitP" to "Počet príkladov:",
+                "lang" to "Jazyk:", "start" to "ŠTART", "history" to "Dnešná história:",
+                "round" to "Kolo", "example" to "Príklad", "time" to "Čas", "answer" to "Odpoveď",
+                "confirm" to "POTVRDIŤ", "results" to "📊 Výsledky", "success" to "Úspešnosť",
+                "totalTime" to "Celkový čas", "correction" to "Oprava chýb:", "perfect" to "Perfektné! 🏆",
+                "retry" to "ZNOVA", "menu" to "MENU", "wrong" to "Nesprávne! Oprav:", "skip" to "PRESKOČIŤ"
             )
         } else {
             mapOf(
-                "title" to "Mathe Trainer v0.42",
-                "limitX" to "Einmaleins bis:",
-                "limitP" to "Anzahl der Aufgaben:",
-                "lang" to "Sprache:",
-                "start" to "START",
-                "history" to "Heutiger Verlauf:",
-                "round" to "Runde",
-                "example" to "Aufgabe",
-                "time" to "Zeit",
-                "answer" to "Antwort",
-                "confirm" to "BESTÄTIGEN",
-                "results" to "📊 Ergebnisse",
-                "success" to "Erfolg",
-                "totalTime" to "Gesamtzeit",
-                "correction" to "Fehlerkorrektur am Ende:",
-                "perfect" to "Perfekt! 🏆",
-                "retry" to "WIEDERHOLEN",
-                "menu" to "MENÜ",
-                "wrong" to "Falsch! Korrigiere:",
-                "skip" to "ÜBERSPRINGEN"
+                "title" to "Mathe Trainer", "limitX" to "Einmaleins bis:", "limitP" to "Anzahl der Aufgaben:",
+                "lang" to "Sprache:", "start" to "START", "history" to "Heutiger Verlauf:",
+                "round" to "Runde", "example" to "Aufgabe", "time" to "Zeit", "answer" to "Antwort",
+                "confirm" to "BESTÄTIGEN", "results" to "📊 Ergebnisse", "success" to "Erfolg",
+                "totalTime" to "Gesamtzeit", "correction" to "Fehlerkorrektur:", "perfect" to "Perfekt! 🏆",
+                "retry" to "WIEDERHOLEN", "menu" to "MENÜ", "wrong" to "Falsch! Korrigiere:", "skip" to "ÜBERSPRINGEN"
             )
         }
     }
 
-    // Nastavenia hry
+    // 2. STAVY (Zoskupené podľa logiky)
     var hraBezi by remember { mutableStateOf(false) }
+    var zobrazVysledok by remember { mutableStateOf(false) }
+    var rezimOpravy by remember { mutableStateOf(false) }
+    
     var limitPrikladov by remember { mutableIntStateOf(10) }
     var hornaHranicaNasobilky by remember { mutableStateOf("10") } 
     var expandedX by remember { mutableStateOf(false) }
     var expandedPocet by remember { mutableStateOf(false) }
     
-    // Stav kola
     var cislo1 by remember { mutableIntStateOf(1) }
     var cislo2 by remember { mutableIntStateOf(1) }
     var vstupPouzivatela by remember { mutableStateOf("") }
@@ -118,27 +94,22 @@ fun MatematickyTrener() {
     var spravneOdpovede by remember { mutableIntStateOf(0) }
     val chybnePriklady = remember { mutableStateListOf<ChybnyPriklad>() }
     
-    // REŽIM OPRAVY (Nový stav)
-    var rezimOpravy by remember { mutableStateOf(false) }
-    
-    // Časomiera
     var startTimeCelkovo by remember { mutableLongStateOf(0L) }
     var startTimePriklad by remember { mutableLongStateOf(0L) }
     var aktualneSekundy by remember { mutableIntStateOf(0) }
     var celkovyCas by remember { mutableLongStateOf(0L) }
     
-    var zobrazVysledok by remember { mutableStateOf(false) }
     var farbaPozadia by remember { mutableStateOf(Color.Transparent) }
-    val animovanaFarba by animateColorAsState(targetValue = farbaPozadia, label = "")
-    val scope = rememberCoroutineScope()
+    val animovanaFarba by animateColorAsState(targetValue = farbaPozadia, label = "bg_color")
 
-    fun generujPriklad() {
+    // 3. LOGIKA FUNKCIÍ
+    val generujPriklad = {
         val max = hornaHranicaNasobilky.toIntOrNull() ?: 10
         cislo1 = (1..max).random()
         cislo2 = (1..max).random()
     }
 
-    fun startNovehoKola() {
+    val startNovehoKola = {
         pocetPrikladov = 0
         spravneOdpovede = 0
         vstupPouzivatela = ""
@@ -152,86 +123,78 @@ fun MatematickyTrener() {
         startTimePriklad = System.currentTimeMillis()
     }
 
-    // Funkcia na prechod na ďalší príklad po úspechu alebo preskočení
-    fun dalsiPriklad() {
-        if (pocetPrikladov < limitPrikladov - 1) {
-            pocetPrikladov++
-            generujPriklad()
-            vstupPouzivatela = ""
-            rezimOpravy = false // Vypneme režim opravy
-            startTimePriklad = System.currentTimeMillis()
-        } else {
-            // Koniec kola
-            celkovyCas = System.currentTimeMillis() - startTimeCelkovo
-            historiaKol.add(ZaznamKola(historiaKol.size + 1, spravneOdpovede, limitPrikladov, celkovyCas / 1000.0))
-            zobrazVysledok = true
-        }
+    val ukonciKolo = {
+        celkovyCas = System.currentTimeMillis() - startTimeCelkovo
+        historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size + 1, spravneOdpovede, limitPrikladov, celkovyCas / 1000.0))
+        zobrazVysledok = true
     }
 
-    // Spracovanie zadanej odpovede (buď prvej alebo opravy)
     fun spracujOdpoved(hodnota: String) {
         val odpoved = hodnota.toIntOrNull() ?: return
-        val spravnyVysledok = cislo1 * cislo2
-        val jeSpravne = odpoved == spravnyVysledok
+        val jeSpravne = odpoved == (cislo1 * cislo2)
         
         scope.launch {
             if (jeSpravne) {
-                // SPRÁVNA ODPOVEĎ (alebo správna oprava)
-                farbaPozadia = Color(0xFFC8E6C9) // Zelená
-                if (!rezimOpravy) spravneOdpovede++ // Pripočítame len ak to nebola oprava
+                farbaPozadia = Color(0xFFC8E6C9)
+                if (!rezimOpravy) spravneOdpovede++
+                delay(400)
+                farbaPozadia = Color.Transparent
+                if (pocetPrikladov < limitPrikladov - 1) {
+                    pocetPrikladov++
+                    generujPriklad()
+                    vstupPouzivatela = ""
+                    rezimOpravy = false
+                    startTimePriklad = System.currentTimeMillis()
+                } else {
+                    ukonciKolo()
+                }
+            } else {
+                farbaPozadia = Color(0xFFFFCDD2)
                 delay(400)
                 farbaPozadia = Color.Transparent
                 vstupPouzivatela = ""
-                dalsiPriklad() // Pokračujeme
-            } else {
-                // NESPRÁVNA ODPOVEĎ
-                farbaPozadia = Color(0xFFFFCDD2) // Červená
-                delay(400)
-                farbaPozadia = Color.Transparent
-                vstupPouzivatela = "" // Vyčistíme pre opravu
-                
-                // Aktivujeme režim opravy pre tento príklad
                 rezimOpravy = true
             }
         }
     }
 
-    // Launcher pre mikrofón (upravený pre režim opravy)
+    // 4. EFEKTY A LAUNCHERY
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK) {
             val data = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             val hovoreneCislo = data?.get(0)?.filter { it.isDigit() } ?: ""
             if (hovoreneCislo.isNotEmpty()) {
                 vstupPouzivatela = hovoreneCislo
-                spracujOdpoved(hovoreneCislo) // Odosiela hlasom zadané číslo (odpoveď alebo opravu)
+                spracujOdpoved(hovoreneCislo)
             }
         }
     }
 
+    // Stopky s ochranou proti Memory Leak
     LaunchedEffect(hraBezi, pocetPrikladov, zobrazVysledok, rezimOpravy) {
         if (hraBezi && !zobrazVysledok && !rezimOpravy) {
-            // Stopky bežia len ak neprebieha oprava
-            startTimePriklad = System.currentTimeMillis() - (aktualneSekundy * 1000)
-            while (hraBezi && !zobrazVysledok && !rezimOpravy) {
-                aktualneSekundy = ((System.currentTimeMillis() - startTimePriklad) / 1000).toInt()
+            val baseTime = System.currentTimeMillis() - (aktualneSekundy * 1000L)
+            while (isActive && hraBezi && !zobrazVysledok && !rezimOpravy) {
+                aktualneSekundy = ((System.currentTimeMillis() - baseTime) / 1000).toInt()
                 delay(500)
             }
         }
     }
 
+    // 5. UI KOMPONENTY
     when {
         !hraBezi -> {
-            // Obrazovka MENU (zostáva rovnaká z v0.41)
             Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(t["title"]!!, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(30.dp))
+                Spacer(Modifier.height(32.dp))
 
+                // Dropdown pre X
                 Text(t["limitX"]!!)
                 ExposedDropdownMenuBox(expanded = expandedX, onExpandedChange = { expandedX = !expandedX }) {
                     OutlinedTextField(
                         value = hornaHranicaNasobilky, onValueChange = {}, readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedX) },
-                        modifier = Modifier.menuAnchor().width(150.dp)
+                        modifier = Modifier.menuAnchor().fillMaxWidth(0.6f)
                     )
                     ExposedDropdownMenu(expanded = expandedX, onDismissRequest = { expandedX = false }) {
                         (1..20).forEach { i ->
@@ -240,13 +203,14 @@ fun MatematickyTrener() {
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
+                // Dropdown pre Počet
                 Text(t["limitP"]!!)
                 ExposedDropdownMenuBox(expanded = expandedPocet, onExpandedChange = { expandedPocet = !expandedPocet }) {
                     OutlinedTextField(
                         value = limitPrikladov.toString(), onValueChange = {}, readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPocet) },
-                        modifier = Modifier.menuAnchor().width(150.dp)
+                        modifier = Modifier.menuAnchor().fillMaxWidth(0.6f)
                     )
                     ExposedDropdownMenu(expanded = expandedPocet, onDismissRequest = { expandedPocet = false }) {
                         listOf(5, 10, 15, 20, 30).forEach { p ->
@@ -255,7 +219,7 @@ fun MatematickyTrener() {
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(t["lang"]!!)
                 Row {
                     listOf("Slovenčina", "Deutsch").forEach { jaz ->
@@ -267,37 +231,33 @@ fun MatematickyTrener() {
                 }
 
                 if (historiaKol.isNotEmpty()) {
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(16.dp))
                     Text(t["history"]!!, fontWeight = FontWeight.SemiBold)
-                    LazyColumn(modifier = Modifier.height(100.dp)) {
-                        items(historiaKol.reversed()) { 
+                    LazyColumn(modifier = Modifier.height(120.dp)) {
+                        items(historiaKol.reversed(), key = { it.id }) { 
                             Text("${t["round"]} ${it.poradie}: ${it.spravne}/${it.celkovo} (${"%.1f".format(it.casSekundy)}s)", fontSize = 14.sp) 
                         }
                     }
                 }
 
                 Spacer(Modifier.weight(1f))
-                Button(onClick = { startNovehoKola() }, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text(t["start"]!!) }
+                Button(onClick = { startNovehoKola() }, modifier = Modifier.fillMaxWidth().height(64.dp)) { Text(t["start"]!!) }
             }
         }
 
         zobrazVysledok -> {
-            // Obrazovka VÝSLEDKY (zostáva rovnaká)
             StatistikaScreen(spravneOdpovede, limitPrikladov, celkovyCas, chybnePriklady, t, { startNovehoKola() }, { hraBezi = false; zobrazVysledok = false })
         }
 
         else -> {
-            // --- OBRAZOVKA HRY A OPRAVY ---
             Column(modifier = Modifier.fillMaxSize().background(animovanaFarba).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("${t["example"]} ${pocetPrikladov + 1} / $limitPrikladov")
                 Text("${t["time"]}: $aktualneSekundy s", color = Color.Gray)
+                Spacer(Modifier.height(48.dp))
                 
-                Spacer(Modifier.height(40.dp))
-                
-                // Zmena dizajnu ak prebieha oprava
                 Text(
                     text = if (rezimOpravy) t["wrong"]!! else "$cislo1 × $cislo2 =", 
-                    fontSize = if (rezimOpravy) 28.sp else 72.sp, 
+                    fontSize = if (rezimOpravy) 32.sp else 72.sp, 
                     fontWeight = FontWeight.Black,
                     color = if (rezimOpravy) Color.Red else Color.Unspecified
                 )
@@ -306,19 +266,15 @@ fun MatematickyTrener() {
                     Text("$cislo1 × $cislo2 =", fontSize = 72.sp, fontWeight = FontWeight.Black, color = Color.Gray)
                 }
 
-                Spacer(Modifier.height(30.dp))
+                Spacer(Modifier.height(32.dp))
                 
-                // VSTUPNÉ POLE (Funguje pre Odpoveď aj Opravu)
                 OutlinedTextField(
                     value = vstupPouzivatela,
                     onValueChange = { 
                         if (it.all { c -> c.isDigit() }) {
                             vstupPouzivatela = it
-                            // Automatické odoslanie opravy po zadaní správneho počtu číslic
-                            val spravnyVysledok = (cislo1 * cislo2).toString()
-                            if (rezimOpravy && it.length == spravnyVysledok.length) {
-                                spracujOdpoved(it)
-                            }
+                            val target = (cislo1 * cislo2).toString()
+                            if (rezimOpravy && it.length == target.length) spracujOdpoved(it)
                         }
                     },
                     label = { Text(if (rezimOpravy) t["correction"]!! else t["answer"]!!) },
@@ -332,38 +288,25 @@ fun MatematickyTrener() {
                             }
                             launcher.launch(intent)
                         }) { Icon(Icons.Default.Mic, null) } 
-                    },
-                    colors = if (rezimOpravy) OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Red, unfocusedBorderColor = Color.Red) else OutlinedTextFieldDefaults.colors()
+                    }
                 )
                 
-                // TLAČIDLÁ (Menia sa podľa režimu)
                 if (rezimOpravy) {
                     Row(modifier = Modifier.padding(top = 24.dp).fillMaxWidth()) {
-                        // Tlačidlo na preskočenie (zapíše chybu)
                         OutlinedButton(
-                            onClick = { 
-                                chybnePriklady.add(ChybnyPriklad(cislo1, cislo2))
-                                dalsiPriklad() // Pokračujeme bez opravy
-                            },
+                            onClick = { chybnePriklady.add(ChybnyPriklad(cislo1, cislo2)); scope.launch { dalsiPriklad() } },
                             modifier = Modifier.weight(1f).height(56.dp)
                         ) { 
                             Icon(Icons.Default.SkipNext, null)
                             Spacer(Modifier.width(8.dp))
                             Text(t["skip"]!!) 
                         }
-                        
-                        // Ručné potvrdenie opravy (ak by automatika zlyhala)
                         Button(
                             onClick = { spracujOdpoved(vstupPouzivatela) }, 
                             modifier = Modifier.weight(1f).padding(start = 8.dp).height(56.dp)
-                        ) { 
-                            Icon(Icons.Default.CheckCircle, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(t["confirm"]!!) 
-                        }
+                        ) { Text(t["confirm"]!!) }
                     }
                 } else {
-                    // Štandardné potvrdenie odpovede
                     Button(onClick = { spracujOdpoved(vstupPouzivatela) }, modifier = Modifier.padding(top = 24.dp).fillMaxWidth().height(56.dp)) { 
                         Text(t["confirm"]!!) 
                     }
@@ -373,7 +316,6 @@ fun MatematickyTrener() {
     }
 }
 
-// Ostatné komponenty (StatistikaScreen, ChybnyPrikladItem) zostávajú rovnaké z v0.41
 @Composable
 fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyPriklad>, t: Map<String, String>, onRetry: () -> Unit, onMenu: () -> Unit) {
     val celkoveSekundy = cas / 1000.0
@@ -381,10 +323,16 @@ fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyP
         Text(t["results"]!!, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Text("${t["success"]}: $spravne / $celkovo", fontSize = 22.sp)
         Text("${t["totalTime"]}: ${"%.1f".format(celkoveSekundy)} s", fontSize = 18.sp)
+        
         if (chybne.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp)); Text(t["correction"]!!, color = Color.Red)
-            LazyColumn(modifier = Modifier.weight(1f)) { items(chybne) { ChybnyPrikladItem(it) } }
-        } else { Spacer(Modifier.weight(1f)); Text(t["perfect"]!!, color = Color(0xFF388E3C), fontSize = 24.sp) }
+            Spacer(Modifier.height(16.dp)); Text(t["correction"]!!, color = Color.Red, fontWeight = FontWeight.Bold)
+            LazyColumn(modifier = Modifier.weight(1f)) { 
+                items(chybne) { ChybnyPrikladItem(it) } 
+            }
+        } else { 
+            Spacer(Modifier.weight(1f)); Text(t["perfect"]!!, color = Color(0xFF388E3C), fontSize = 24.sp) 
+        }
+        
         Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text(t["retry"]!!) }
         OutlinedButton(onClick = onMenu, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(t["menu"]!!) }
     }
@@ -398,8 +346,21 @@ fun ChybnyPrikladItem(priklad: ChybnyPriklad) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${priklad.c1} × ${priklad.c2} =", modifier = Modifier.width(100.dp))
             if (!opravene) {
-                OutlinedTextField(value = opravaVstup, onValueChange = { if (it.all { c -> c.isDigit() }) opravaVstup = it }, modifier = Modifier.width(80.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-                IconButton(onClick = { if (opravaVstup.toIntOrNull() == priklad.c1 * priklad.c2) opravene = true }) { Icon(Icons.Default.CheckCircle, null) }
+                OutlinedTextField(
+                    value = opravaVstup, 
+                    onValueChange = { 
+                        if (it.all { c -> c.isDigit() }) {
+                            opravaVstup = it
+                            if (it.toIntOrNull() == (priklad.c1 * priklad.c2)) opravene = true
+                        }
+                    }, 
+                    modifier = Modifier.width(80.dp), 
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                    singleLine = true
+                )
+                IconButton(onClick = { if (opravaVstup.toIntOrNull() == (priklad.c1 * priklad.c2)) opravene = true }) { 
+                    Icon(Icons.Default.CheckCircle, null, tint = if (opravaVstup.isNotEmpty()) Color.Black else Color.Gray) 
+                }
             } else {
                 Text("${priklad.c1 * priklad.c2}", fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
                 Spacer(Modifier.weight(1f)); Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF388E3C))
