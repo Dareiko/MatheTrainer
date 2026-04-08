@@ -133,6 +133,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val context = LocalContext.current
+    val isDark = isSystemInDarkTheme() || themeMode == "dark"
     
     // Lokalizácia
     var jazyk by remember { mutableStateOf("Slovenčina") }
@@ -172,7 +173,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
     var celkovyCas by remember { mutableLongStateOf(0L) }
     var bgFarba by remember { mutableStateOf(Color.Transparent) }
     val animBg by animateColorAsState(bgFarba, label = "bg")
-    val progress by animateFloatAsState(if(hraBezi) (aktualnyIndex.toFloat() / limit) else 0f, label = "p")
+    val progressValue = if(hraBezi && limit > 0) (aktualnyIndex.toFloat() / limit) else 0f
 
     // --- LOGIKA ---
     val generuj = {
@@ -189,7 +190,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         scope.launch {
             if (res == n1 * n2) {
                 vibruj(context, "ok")
-                bgFarba = if(isSystemInDarkTheme()) Color(0xFF1B5E20) else Color(0xFFC8E6C9)
+                bgFarba = if(isDark) Color(0xFF1B5E20) else Color(0xFFC8E6C9)
                 if(!rezimOpravy) body++
                 delay(350); bgFarba = Color.Transparent
                 if (aktualnyIndex < limit - 1) {
@@ -199,7 +200,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                 }
             } else {
                 vibruj(context, "err")
-                bgFarba = if(isSystemInDarkTheme()) Color(0xFFB71C1C) else Color(0xFFFFCDD2)
+                bgFarba = if(isDark) Color(0xFFB71C1C) else Color(0xFFFFCDD2)
                 delay(350); bgFarba = Color.Transparent; vstup = ""; rezimOpravy = true
             }
         }
@@ -228,7 +229,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         drawerContent = {
             ModalDrawerSheet {
                 Text("Mathe Trainer", Modifier.padding(16.dp), fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                HorizontalDivider()
+                Divider() // Opravené na Divider
                 NavigationDrawerItem(label={Text(if(jePauza) t["resume"]!! else t["pause"]!!)}, icon={Icon(if(jePauza) Icons.Default.PlayArrow else Icons.Default.Pause, null)}, selected=false, onClick={jePauza=!jePauza; scope.launch{drawerState.close()}})
                 NavigationDrawerItem(label={Text(t["lang"]!! + ": " + jazyk)}, icon={Icon(Icons.Default.Language, null)}, selected=false, onClick={jazyk = if(jazyk=="Slovenčina") "Deutsch" else "Slovenčina"})
                 NavigationDrawerItem(label={Text(t["theme"]!! + ": " + themeMode.uppercase())}, icon={Icon(Icons.Default.BrightnessMedium, null)}, selected=false, onClick={onThemeToggle(if(themeMode=="light") "dark" else if(themeMode=="dark") "system" else "light")})
@@ -240,32 +241,34 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
             topBar = {
                 Column {
                     CenterAlignedTopAppBar(title={Text(t["title"]!!, fontWeight=FontWeight.Black)}, navigationIcon={IconButton(onClick={scope.launch{drawerState.open()}}){Icon(Icons.Default.Menu, null)}})
-                    if(hraBezi && !zobrazVysledok) LinearProgressIndicator(progress={progress}, modifier=Modifier.fillMaxWidth())
+                    if(hraBezi && !zobrazVysledok) {
+                        LinearProgressIndicator(progress = progressValue, modifier = Modifier.fillMaxWidth())
+                    }
                 }
             },
             bottomBar = { Text("DCC © 2026 | All Rights Reserved", Modifier.fillMaxWidth().padding(8.dp), fontSize=9.sp, textAlign=TextAlign.Center, color=Color.Gray) }
         ) { p ->
             Box(Modifier.fillMaxSize().padding(p)) {
                 when {
-                    jePauza -> Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
+                    jePauza -> Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Icon(Icons.Default.PauseCircle, null, Modifier.size(80.dp), MaterialTheme.colorScheme.primary)
                         Text(t["resume"]!!, fontSize=20.sp); Button(onClick={jePauza=false}, Modifier.padding(16.dp)){Text(t["resume"]!!)}
                     }
-                    !hraBezi -> Column(Modifier.fillMaxSize().padding(16.dp), Alignment.CenterHorizontally) {
+                    !hraBezi -> Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         var exX by remember { mutableStateOf(false) }; var exP by remember { mutableStateOf(false) }
                         Text(t["limitX"]!!)
                         ExposedDropdownMenuBox(exX, {exX=!exX}){
-                            OutlinedTextField(typX,{},true,trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(exX)}, modifier=Modifier.menuAnchor().width(140.dp))
+                            OutlinedTextField(value = typX, onValueChange = {}, readOnly = true, trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(expanded = exX)}, modifier=Modifier.menuAnchor().width(140.dp))
                             ExposedDropdownMenu(exX, {exX=false}){ (10..20).forEach{ i -> DropdownMenuItem(text={Text(i.toString())}, onClick={typX=i.toString(); exX=false}) } }
                         }
                         Spacer(Modifier.height(8.dp)); Text(t["limitP"]!!)
                         ExposedDropdownMenuBox(exP, {exP=!exP}){
-                            OutlinedTextField(limit.toString(),{},true,trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(exP)}, modifier=Modifier.menuAnchor().width(140.dp))
+                            OutlinedTextField(value = limit.toString(), onValueChange = {}, readOnly = true, trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(expanded = exP)}, modifier=Modifier.menuAnchor().width(140.dp))
                             ExposedDropdownMenu(exP, {exP=false}){ listOf(5,10,15,20,30).forEach{ i -> DropdownMenuItem(text={Text(i.toString())}, onClick={limit=i; exP=false}) } }
                         }
                         if(historiaKol.isNotEmpty()) {
                             Spacer(Modifier.height(16.dp)); Text(t["history"]!!, fontWeight=FontWeight.Bold)
-                            TrendovyGraf(historiaKol, isSystemInDarkTheme())
+                            TrendovyGraf(historiaKol, isDark)
                             Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp)) {
                                 listOf(t["type"]!! to 1f, "N" to 0.7f, t["time"]!! to 1.3f, "%" to 0.7f, "OK" to 0.7f).forEach { (txt, w) -> Text(txt, Modifier.weight(w), fontSize=10.sp, textAlign=TextAlign.Center, fontWeight=FontWeight.Bold) }
                             }
@@ -273,11 +276,11 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                                 items(historiaKol.reversed(), key={it.id}){ k ->
                                     val u = (k.spravne.toDouble()/k.celkovo*100).toInt()
                                     Row(Modifier.fillMaxWidth().padding(4.dp).border(0.5.dp, Color.LightGray)) {
-                                        Text("1-${k.typX}", Modifier.weight(1f), fontSize=11.sp, textAlign=TextAlign.Center)
-                                        Text("${k.celkovo}", Modifier.weight(0.7f), fontSize=11.sp, textAlign=TextAlign.Center)
-                                        Text("${"%.1f".format(k.casSekundy)}s", Modifier.weight(1.3f), fontSize=11.sp, textAlign=TextAlign.Center)
-                                        Text("$u%", Modifier.weight(0.7f), fontSize=11.sp, textAlign=TextAlign.Center, color=if(u<50) Color.Red else MaterialTheme.colorScheme.primary)
-                                        Text("${k.spravne}", Modifier.weight(0.7f), fontSize=11.sp, textAlign=TextAlign.Center)
+                                        Text("1-${k.typX}", Modifier.weight(1f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                                        Text("${k.celkovo}", Modifier.weight(0.7f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                                        Text("${"%.1f".format(k.casSekundy)}s", Modifier.weight(1.3f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                                        Text("$u%", Modifier.weight(0.7f), fontSize = 11.sp, textAlign = TextAlign.Center, color = if(u<50) Color.Red else MaterialTheme.colorScheme.primary)
+                                        Text("${k.spravne}", Modifier.weight(0.7f), fontSize = 11.sp, textAlign = TextAlign.Center)
                                     }
                                 }
                             }
@@ -285,17 +288,17 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                         Button({ startT=System.currentTimeMillis(); sekundy=0; body=0; aktualnyIndex=0; chyby.clear(); hraBezi=true; generuj() }, Modifier.fillMaxWidth().height(60.dp).padding(top=8.dp)){Text(t["start"]!!)}
                     }
                     zobrazVysledok -> StatistikaScreen(body, limit, celkovyCas, chyby, t, { hraBezi=false; zobrazVysledok=false })
-                    else -> Column(Modifier.fillMaxSize().background(animBg).padding(20.dp), Alignment.CenterHorizontally) {
+                    else -> Column(Modifier.fillMaxSize().background(animBg).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("${t["example"]} ${aktualnyIndex+1}/$limit | ${sekundy}s", color=Color.Gray)
                         Spacer(Modifier.height(40.dp))
                         Text(if(rezimOpravy) t["wrong"]!! else "$n1 × $n2 =", fontSize=if(rezimOpravy) 30.sp else 70.sp, fontWeight=FontWeight.ExtraBold, color=if(rezimOpravy) Color.Red else Color.Unspecified)
                         if(rezimOpravy) Text("$n1 × $n2 =", fontSize=70.sp, fontWeight=FontWeight.Black, color=Color.Gray)
                         Spacer(Modifier.height(30.dp))
-                        OutlinedTextField(vstup, { if(it.all{c->c.isDigit()}){ vstup=it; if(rezimOpravy && it.length==(n1*n2).toString().length) potvrd(it) } }, label={Text(t["answer"]!!)}, modifier=Modifier.fillMaxWidth(), keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number), trailingIcon={IconButton({ val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, if(jazyk=="Slovenčina") "sk-SK" else "de-DE") }; mic.launch(i) }){Icon(Icons.Default.Mic, null)}})
+                        OutlinedTextField(value = vstup, onValueChange = { if(it.all{c->c.isDigit()}){ vstup=it; if(rezimOpravy && it.length==(n1*n2).toString().length) potvrd(it) } }, label={Text(t["answer"]!!)}, modifier=Modifier.fillMaxWidth(), keyboardOptions=KeyboardOptions(keyboardType = KeyboardType.Number), trailingIcon={IconButton(onClick = { val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, if(jazyk=="Slovenčina") "sk-SK" else "de-DE") }; mic.launch(i) }){Icon(Icons.Default.Mic, null)}})
                         if(rezimOpravy) Row(Modifier.padding(top=20.dp)) {
-                            OutlinedButton({ chyby.add(ChybnyPriklad(n1,n2)); if(aktualnyIndex<limit-1){aktualnyIndex++; generuj(); vstup=""; rezimOpravy=false} else {celkovyCas=System.currentTimeMillis()-startT; historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size+1, typX, body, limit, celkovyCas/1000.0)); zobrazVysledok=true} }, Modifier.weight(1f).height(55.dp)){Icon(Icons.Default.SkipNext, null); Text(t["skip"]!!)}
-                            Button({potvrd(vstup)}, Modifier.weight(1f).padding(start=8.dp).height(55.dp)){Text(t["confirm"]!!)}
-                        } else Button({potvrd(vstup)}, Modifier.fillMaxWidth().padding(top=20.dp).height(55.dp)){Text(t["confirm"]!!)}
+                            OutlinedButton(onClick = { chyby.add(ChybnyPriklad(n1,n2)); if(aktualnyIndex<limit-1){aktualnyIndex++; generuj(); vstup=""; rezimOpravy=false} else {celkovyCas=System.currentTimeMillis()-startT; historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size+1, typX, body, limit, celkovyCas/1000.0)); zobrazVysledok=true} }, modifier = Modifier.weight(1f).height(55.dp)){Icon(Icons.Default.SkipNext, null); Text(t["skip"]!!)}
+                            Button(onClick = {potvrd(vstup)}, modifier = Modifier.weight(1f).padding(start=8.dp).height(55.dp)){Text(t["confirm"]!!)}
+                        } else Button(onClick = {potvrd(vstup)}, modifier = Modifier.fillMaxWidth().padding(top=20.dp).height(55.dp)){Text(t["confirm"]!!)}
                     }
                 }
             }
@@ -306,7 +309,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
 @Composable
 fun StatistikaScreen(ok: Int, tot: Int, ms: Long, errs: List<ChybnyPriklad>, t: Map<String, String>, onMenu: () -> Unit) {
     val sec = ms / 1000.0
-    Column(Modifier.fillMaxSize().padding(20.dp), Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(t["results"]!!, fontSize=30.sp, fontWeight=FontWeight.Bold)
         Text("${t["success"]}: $ok/$tot | ${t["totalTime"]}: ${"%.1f".format(sec)}s", fontSize=18.sp)
         Text("${t["average"]}: ${"%.2f".format(sec/tot)}s", color=MaterialTheme.colorScheme.primary)
@@ -314,19 +317,19 @@ fun StatistikaScreen(ok: Int, tot: Int, ms: Long, errs: List<ChybnyPriklad>, t: 
             Spacer(Modifier.height(10.dp)); Text(t["correction"]!!, color=Color.Red, fontWeight=FontWeight.Bold)
             LazyColumn(Modifier.weight(1f)){ items(errs){ e -> ChybnyPrikladItem(e) } }
         } else { Spacer(Modifier.weight(1f)); Text(t["perfect"]!!, fontSize=26.sp, color=Color(0xFF388E3C), fontWeight=FontWeight.Bold) }
-        Button(onMenu, Modifier.fillMaxWidth()){Text(t["menu"]!!)}
+        Button(onClick = onMenu, modifier = Modifier.fillMaxWidth()){Text(t["menu"]!!)}
     }
 }
 
 @Composable
 fun ChybnyPrikladItem(e: ChybnyPriklad) {
     var v by remember { mutableStateOf("") }; var done by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth().padding(4.dp), colors=CardDefaults.cardColors(if(done) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)) {
-        Row(Modifier.padding(12.dp), Alignment.CenterVertically) {
+    Card(Modifier.fillMaxWidth().padding(4.dp), colors=CardDefaults.cardColors(containerColor = if(done) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${e.c1} × ${e.c2} =", Modifier.width(100.dp))
             if(!done){
-                OutlinedTextField(v, { if(it.all{c->c.isDigit()}){ v=it; if(it.toIntOrNull()==e.c1*e.c2) done=true } }, Modifier.width(80.dp), keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
-                IconButton({if(v.toIntOrNull()==e.c1*e.c2) done=true}){Icon(Icons.Default.CheckCircle, null)}
+                OutlinedTextField(value = v, onValueChange = { if(it.all{c->c.isDigit()}){ v=it; if(it.toIntOrNull()==e.c1*e.c2) done=true } }, modifier = Modifier.width(80.dp), keyboardOptions=KeyboardOptions(keyboardType = KeyboardType.Number))
+                IconButton(onClick = {if(v.toIntOrNull()==e.c1*e.c2) done=true}){Icon(Icons.Default.CheckCircle, null)}
             } else { Text("${e.c1*e.c2}", fontWeight=FontWeight.Bold); Spacer(Modifier.weight(1f)); Icon(Icons.Default.CheckCircle, null) }
         }
     }
