@@ -1,6 +1,5 @@
 package dcc.mathe
 
-// ... (všetky importy zostávajú rovnaké ako minule)
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Trieda pre uloženie chybného príkladu
 data class ChybnyPriklad(val c1: Int, val c2: Int)
 
 class MainActivity : ComponentActivity() {
@@ -57,7 +55,6 @@ fun MatematickyTrener() {
     var pocetPrikladov by remember { mutableIntStateOf(0) }
     var spravneOdpovede by remember { mutableIntStateOf(0) }
     
-    // Zoznam pre chybné príklady
     val chybnePriklady = remember { mutableStateListOf<ChybnyPriklad>() }
     
     var startTimeCelkovo by remember { mutableLongStateOf(0L) }
@@ -73,6 +70,19 @@ fun MatematickyTrener() {
     val jazyky = listOf("Slovenčina", "Deutsch")
     var zvolenyJazyk by remember { mutableStateOf(jazyky[0]) }
 
+    // Funkcia na ÚPLNÝ REŠTART všetkých hodnôt
+    fun resetujHru() {
+        pocetPrikladov = 0
+        spravneOdpovede = 0
+        vstupPouzivatela = ""
+        aktualneSekundy = 0
+        chybnePriklady.clear()
+        cislo1 = (1..12).random()
+        cislo2 = (1..12).random()
+        zobrazVysledok = false
+        hraBezi = false
+    }
+
     fun spracujOdpoved(hodnota: String) {
         val odpoved = hodnota.toIntOrNull()
         val jeSpravne = odpoved == cislo1 * cislo2
@@ -82,7 +92,6 @@ fun MatematickyTrener() {
             if (jeSpravne) {
                 spravneOdpovede++
             } else {
-                // PRIDANIE DO ZOZNAMU CHÝB
                 chybnePriklady.add(ChybnyPriklad(cislo1, cislo2))
             }
             delay(400)
@@ -92,7 +101,7 @@ fun MatematickyTrener() {
                 pocetPrikladov++
                 cislo1 = (1..12).random()
                 cislo2 = (1..12).random()
-                vstupPouzivatela = ""
+                vstupPouzivatela = "" // Vynulovanie vstupu pre nový príklad
                 startTimePriklad = System.currentTimeMillis()
             } else {
                 celkovyCas = System.currentTimeMillis() - startTimeCelkovo
@@ -142,15 +151,16 @@ fun MatematickyTrener() {
                 }
                 Spacer(Modifier.height(40.dp))
                 Button(onClick = { 
-                    chybnePriklady.clear() // Vyčistenie starých chýb
-                    hraBezi = true; startTimeCelkovo = System.currentTimeMillis() 
+                    resetujHru() // Vyčistíme všetko pred štartom
+                    hraBezi = true
+                    startTimeCelkovo = System.currentTimeMillis() 
                 }, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("ŠTART") }
             }
         }
 
         zobrazVysledok -> {
             StatistikaScreen(spravneOdpovede, limitPrikladov, celkovyCas, chybnePriklady) {
-                hraBezi = false; zobrazVysledok = false; pocetPrikladov = 0; spravneOdpovede = 0
+                resetujHru() // Návrat do menu vyčistí hru
             }
         }
 
@@ -167,7 +177,17 @@ fun MatematickyTrener() {
                     label = { Text("Odpoveď") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    trailingIcon = { IconButton(onClick = { /* Launcher code */ }) { Icon(Icons.Default.Mic, contentDescription = null) } }
+                    trailingIcon = { 
+                        IconButton(onClick = {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (zvolenyJazyk == "Slovenčina") "sk-SK" else "de-DE")
+                            }
+                            launcher.launch(intent)
+                        }) { 
+                            Icon(Icons.Default.Mic, contentDescription = null) 
+                        } 
+                    }
                 )
                 Button(onClick = { spracujOdpoved(vstupPouzivatela) }, modifier = Modifier.padding(top = 24.dp).fillMaxWidth().height(56.dp)) { Text("POTVRDIŤ") }
             }
@@ -177,16 +197,21 @@ fun MatematickyTrener() {
 
 @Composable
 fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyPriklad>, onRestart: () -> Unit) {
+    // Výpočet priemeru
+    val celkoveSekundy = cas / 1000.0
+    val priemer = if (celkovo > 0) celkoveSekundy / celkovo else 0.0
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("📊 Výsledky", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Text("Úspešnosť: $spravne / $celkovo", fontSize = 20.sp)
-        Text("Celkový čas: ${cas / 1000} s", color = Color.Gray)
+        Spacer(Modifier.height(8.dp))
+        Text("Úspešnosť: $spravne / $celkovo", fontSize = 22.sp)
+        Text("Celkový čas: ${celkoveSekundy.toInt()} s", fontSize = 18.sp)
+        // Zobrazenie priemeru na 2 desatinné miesta
+        Text("Priemer na príklad: ${"%.2f".format(priemer)} s", fontSize = 18.sp, color = Color(0xFF1976D2))
 
         if (chybne.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text("Oprava chýb:", fontWeight = FontWeight.Bold, color = Color.Red)
-            
-            // ZOZNAM CHÝB S MOŽNOSŤOU OPRAVY
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 items(chybne) { priklad ->
                     ChybnyPrikladItem(priklad)
@@ -194,10 +219,10 @@ fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyP
             }
         } else {
             Spacer(Modifier.weight(1f))
-            Text("Všetko správne! Výborne! 🎉", fontSize = 20.sp, color = Color(0xFF388E3C))
+            Text("Bezchybné kolo! 🏆", fontSize = 24.sp, color = Color(0xFF388E3C), fontWeight = FontWeight.Bold)
         }
 
-        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("MENU") }
+        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("MENU / REŠTART") }
     }
 }
 
@@ -215,7 +240,7 @@ fun ChybnyPrikladItem(priklad: ChybnyPriklad) {
                 OutlinedTextField(
                     value = opravaVstup,
                     onValueChange = { if (it.all { c -> c.isDigit() }) opravaVstup = it },
-                    modifier = Modifier.width(100.dp),
+                    modifier = Modifier.width(80.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
                 )
@@ -224,7 +249,7 @@ fun ChybnyPrikladItem(priklad: ChybnyPriklad) {
                         opravene = true
                     }
                 }) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = "Opraviť", tint = Color.Gray)
+                    Icon(Icons.Default.CheckCircle, contentDescription = "OK", tint = Color.Gray)
                 }
             } else {
                 Text("${priklad.c1 * priklad.c2}", fontWeight = FontWeight.Bold, color = Color(0xFF388E3C), fontSize = 18.sp)
