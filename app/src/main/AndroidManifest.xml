@@ -8,7 +8,6 @@
         android:label="Mathe Trainer"
         android:icon="@drawable/ic_launcher"
         android:supportsRtl="true">
-    </application>
         
         <activity
             android:name=".MainActivity"
