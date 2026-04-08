@@ -62,23 +62,32 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- POMOCNÉ FUNKCIE (Vibrácie) ---
+// --- BEZPEČNÁ FUNKCIA NA VIBRÁCIE ---
 fun vibruj(context: Context, typ: String) {
-    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-        vm.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-    }
-    if (typ == "ok") {
-        vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
-    } else {
-        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 60, 100, 60), -1))
+    try {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vm?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+
+        vibrator?.let {
+            if (it.hasVibrator()) {
+                if (typ == "ok") {
+                    it.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    it.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 60, 100, 60), -1))
+                }
+            }
+        }
+    } catch (e: Exception) {
+        // Ak vibrácie zlyhajú, aplikácia aspoň nespadne
+        e.printStackTrace()
     }
 }
 
-// --- KOMPONENT GRAFU ---
 @Composable
 fun TrendovyGraf(historia: List<ZaznamKola>, isDark: Boolean) {
     if (historia.size < 2) return
@@ -106,7 +115,6 @@ fun TrendovyGraf(historia: List<ZaznamKola>, isDark: Boolean) {
     }
 }
 
-// --- HLAVNÝ WRAPPER (Témy) ---
 @Composable
 fun MatematickyTrenerApp() {
     var themeMode by remember { mutableStateOf("system") }
@@ -135,7 +143,6 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme() || themeMode == "dark"
     
-    // Lokalizácia
     var jazyk by remember { mutableStateOf("Slovenčina") }
     val t = remember(jazyk) {
         if (jazyk == "Slovenčina") mapOf(
@@ -155,7 +162,6 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         )
     }
 
-    // Herné stavy
     var hraBezi by remember { mutableStateOf(false) }
     var jePauza by remember { mutableStateOf(false) }
     var zobrazVysledok by remember { mutableStateOf(false) }
@@ -175,7 +181,6 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
     val animBg by animateColorAsState(bgFarba, label = "bg")
     val progressValue = if(hraBezi && limit > 0) (aktualnyIndex.toFloat() / limit) else 0f
 
-    // --- LOGIKA ---
     val generuj = {
         val max = typX.toIntOrNull() ?: 10
         fun vaha(i: Int) = when(i){ 1->1; 2,5,10->2; in 6..9->4; else->3 }
@@ -196,7 +201,9 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                 if (aktualnyIndex < limit - 1) {
                     aktualnyIndex++; generuj(); vstup = ""; rezimOpravy = false
                 } else {
-                    celkovyCas = System.currentTimeMillis() - startT; historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size+1, typX, body, limit, celkovyCas/1000.0)); zobrazVysledok = true
+                    celkovyCas = System.currentTimeMillis() - startT
+                    historiaKol.add(ZaznamKola(System.currentTimeMillis(), historiaKol.size+1, typX, body, limit, celkovyCas/1000.0))
+                    zobrazVysledok = true
                 }
             } else {
                 vibruj(context, "err")
@@ -218,18 +225,18 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         if (hraBezi && !zobrazVysledok && !rezimOpravy && !jePauza) {
             val start = System.currentTimeMillis() - (sekundy * 1000L)
             while (isActive && hraBezi && !zobrazVysledok && !rezimOpravy && !jePauza) {
-                sekundy = ((System.currentTimeMillis() - start) / 1000).toInt(); delay(500)
+                sekundy = ((System.currentTimeMillis() - start) / 1000).toInt()
+                delay(500)
             }
         }
     }
 
-    // --- UI ---
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
                 Text("Mathe Trainer", Modifier.padding(16.dp), fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                Divider() // Opravené na Divider
+                Divider()
                 NavigationDrawerItem(label={Text(if(jePauza) t["resume"]!! else t["pause"]!!)}, icon={Icon(if(jePauza) Icons.Default.PlayArrow else Icons.Default.Pause, null)}, selected=false, onClick={jePauza=!jePauza; scope.launch{drawerState.close()}})
                 NavigationDrawerItem(label={Text(t["lang"]!! + ": " + jazyk)}, icon={Icon(Icons.Default.Language, null)}, selected=false, onClick={jazyk = if(jazyk=="Slovenčina") "Deutsch" else "Slovenčina"})
                 NavigationDrawerItem(label={Text(t["theme"]!! + ": " + themeMode.uppercase())}, icon={Icon(Icons.Default.BrightnessMedium, null)}, selected=false, onClick={onThemeToggle(if(themeMode=="light") "dark" else if(themeMode=="dark") "system" else "light")})
