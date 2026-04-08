@@ -49,9 +49,10 @@ class MainActivity : ComponentActivity() {
 fun MatematickyTrener() {
     val historiaKol = remember { mutableStateListOf<ZaznamKola>() }
     
+    // Nastavenia - hornaHranicaNasobilky je teraz na zaciatku prazdna
     var hraBezi by remember { mutableStateOf(false) }
     var limitPrikladov by remember { mutableIntStateOf(5) }
-    var hornaHranicaNasobilky by remember { mutableStateOf("10") }
+    var hornaHranicaNasobilky by remember { mutableStateOf("") } 
     var zvolenyJazyk by remember { mutableStateOf("Slovenčina") }
     
     var cislo1 by remember { mutableIntStateOf(1) }
@@ -75,6 +76,23 @@ fun MatematickyTrener() {
         val max = hornaHranicaNasobilky.toIntOrNull()?.coerceIn(1, 20) ?: 10
         cislo1 = (1..max).random()
         cislo2 = (1..max).random()
+    }
+
+    fun startNovehoKola() {
+        pocetPrikladov = 0
+        spravneOdpovede = 0
+        vstupPouzivatela = ""
+        aktualneSekundy = 0
+        chybnePriklady.clear()
+        zobrazVysledok = false
+        hraBezi = true
+        generujPriklad()
+        startTimeCelkovo = System.currentTimeMillis()
+    }
+
+    fun resetDoMenu() {
+        resetujHru() // Vyčistí stav kola
+        hornaHranicaNasobilky = "" // Vyčistí aj nastavenie
     }
 
     fun resetujHru() {
@@ -138,12 +156,14 @@ fun MatematickyTrener() {
                 Text("Tréner násobilky", fontSize = 32.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(20.dp))
                 
-                Text("Násobilka od 1 do (max 20):")
+                Text("Násobilka od 1 do (1-20):", color = if (hornaHranicaNasobilky.isEmpty()) Color.Red else Color.Unspecified)
                 OutlinedTextField(
                     value = hornaHranicaNasobilky,
                     onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) hornaHranicaNasobilky = it },
+                    placeholder = { Text("Zadaj X") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier.width(120.dp),
+                    isError = hornaHranicaNasobilky.isEmpty()
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -158,7 +178,7 @@ fun MatematickyTrener() {
                 }
 
                 Spacer(Modifier.height(16.dp))
-                Text("Jazyk pre hlas:")
+                Text("Jazyk:")
                 Row {
                     listOf("Slovenčina", "Deutsch").forEach { jaz ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.selectable(jaz == zvolenyJazyk, onClick = { zvolenyJazyk = jaz }).padding(8.dp)) {
@@ -179,23 +199,31 @@ fun MatematickyTrener() {
                 }
 
                 Spacer(Modifier.weight(1f))
-                Button(onClick = { 
-                    resetujHru()
-                    generujPriklad()
-                    hraBezi = true
-                    startTimeCelkovo = System.currentTimeMillis() 
-                }, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("ŠTART") }
+                Button(
+                    onClick = { startNovehoKola() }, 
+                    enabled = hornaHranicaNasobilky.isNotEmpty() && (hornaHranicaNasobilky.toIntOrNull() ?: 0) > 0,
+                    modifier = Modifier.fillMaxWidth().height(60.dp)
+                ) { 
+                    Text("ŠTART") 
+                }
             }
         }
 
         zobrazVysledok -> {
-            StatistikaScreen(spravneOdpovede, limitPrikladov, celkovyCas, chybnePriklady) { resetujHru() }
+            StatistikaScreen(
+                spravne = spravneOdpovede, 
+                celkovo = limitPrikladov, 
+                cas = celkovyCas, 
+                chybne = chybnePriklady,
+                onRetry = { startNovehoKola() }, // Rovnaké parametre
+                onMenu = { resetDoMenu() } // Úplný reštart
+            )
         }
 
         else -> {
             Column(modifier = Modifier.fillMaxSize().background(animovanaFarba).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Príklad ${pocetPrikladov + 1} / $limitPrikladov")
-                Text("Čas príkladu: $aktualneSekundy s", color = Color.Gray)
+                Text("Čas: $aktualneSekundy s", color = Color.Gray)
                 Spacer(Modifier.height(40.dp))
                 Text("$cislo1 × $cislo2 =", fontSize = 72.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(30.dp))
@@ -222,7 +250,7 @@ fun MatematickyTrener() {
 }
 
 @Composable
-fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyPriklad>, onRestart: () -> Unit) {
+fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyPriklad>, onRetry: () -> Unit, onMenu: () -> Unit) {
     val celkoveSekundy = cas / 1000.0
     val priemer = if (celkovo > 0) celkoveSekundy / celkovo else 0.0
 
@@ -231,20 +259,22 @@ fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyP
         Spacer(Modifier.height(10.dp))
         Text("Úspešnosť: $spravne / $celkovo", fontSize = 22.sp)
         Text("Celkový čas: ${"%.1f".format(celkoveSekundy)} s", fontSize = 18.sp)
-        Text("Priemer na príklad: ${"%.2f".format(priemer)} s", fontSize = 18.sp, color = Color(0xFF1976D2))
+        Text("Priemer: ${"%.2f".format(priemer)} s / príklad", color = Color(0xFF1976D2))
 
         if (chybne.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             Text("Oprava chýb:", fontWeight = FontWeight.Bold, color = Color.Red)
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 items(chybne) { priklad -> ChybnyPrikladItem(priklad) }
             }
         } else {
             Spacer(Modifier.weight(1f))
-            Text("Všetko správne! 🎉", fontSize = 24.sp, color = Color(0xFF388E3C), fontWeight = FontWeight.Bold)
+            Text("Vynikajúco! 🏆", fontSize = 24.sp, color = Color(0xFF388E3C), fontWeight = FontWeight.Bold)
         }
 
-        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("SPÄŤ DO MENU") }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("HRAŤ ZNOVU (Rovnaké nastavenia)") }
+        OutlinedButton(onClick = onMenu, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("HLAVNÉ MENU (Nové nastavenia)") }
     }
 }
 
