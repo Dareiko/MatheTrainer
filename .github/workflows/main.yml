@@ -12,22 +12,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4 # v4 je momentálne stabilnejšia pri sieťových chybách
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # Ak v repo chýba wrapper, tento krok ho vytvorí
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.2
+          cache-disabled: true # Vypneme cache, kým má GitHub výpadok
 
       - name: Build with Gradle
-        run: gradle assembleDebug
+        # Pridali sme --stacktrace, aby sme v prípade chyby videli presný dôvod
+        run: gradle :app:assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
