@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha // PRIDANÝ IMPORT
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -220,9 +221,11 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
             },
             bottomBar = {
                 Text(
-                    "DCC, všetky práva vyhradené, 2026",
-                    Modifier.fillMaxWidth().padding(8.dp).background(MaterialTheme.colorScheme.surface).alpha(0.6f),
-                    fontSize = 10.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface
+                    text = "DCC, všetky práva vyhradené, 2026",
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray.copy(alpha = 0.7f) // Zmenené pre kompatibilitu
                 )
             }
         ) { p ->
@@ -236,7 +239,6 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                         var exX by remember { mutableStateOf(false) }
                         var exP by remember { mutableStateOf(false) }
 
-                        // VÝBER NÁSOBILKY
                         Text(t["limitX"]!!)
                         ExposedDropdownMenuBox(exX, { exX = !exX }) {
                             OutlinedTextField(value = typX, onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = exX) }, modifier = Modifier.menuAnchor().width(150.dp))
@@ -247,7 +249,6 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
 
                         Spacer(Modifier.height(8.dp))
 
-                        // VÝBER POČTU PRÍKLADOV
                         Text(t["limitP"]!!)
                         ExposedDropdownMenuBox(exP, { exP = !exP }) {
                             OutlinedTextField(value = limit.toString(), onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = exP) }, modifier = Modifier.menuAnchor().width(150.dp))
@@ -261,7 +262,6 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                             Text(t["history"]!!, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             TrendovyGraf(historiaKol, isSystemInDarkTheme() || themeMode == "dark")
                             
-                            // TABUĽKA ŠTATISTÍK
                             Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp)) {
                                 listOf("Typ" to 1f, "N" to 0.7f, "Čas" to 1.3f, "%" to 0.8f, "OK" to 0.7f).forEach { (txt, w) ->
                                     Text(txt, Modifier.weight(w), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
@@ -297,9 +297,9 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Top
                     ) {
-                        Text("${t["example"]} ${aktualnyIndex + 1} / $limit | ${sekundy}s", color = MaterialTheme.colorScheme.onBackground)
+                        Text("${t["example"]} ${aktualnyIndex + 1} / $limit | ${sekundy}s")
                         Spacer(Modifier.height(40.dp))
-                        Text("$n1 × $n2 =", fontSize = 70.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text("$n1 × $n2 =", fontSize = 70.sp, fontWeight = FontWeight.Bold)
                         OutlinedTextField(vstup, { if (it.all { c -> c.isDigit() }) vstup = it }, Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                         Button({ potvrd(vstup) }, Modifier.fillMaxWidth().padding(top = 20.dp)) { Text("POTVRDIŤ") }
                         IconButton({ val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM) }; mic.launch(i) }) { Icon(Icons.Default.Mic, null) }
