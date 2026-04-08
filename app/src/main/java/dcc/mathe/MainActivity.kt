@@ -47,15 +47,13 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MatematickyTrener() {
-    // Globálna história (prežije reštart kola, ale nie vypnutie app)
     val historiaKol = remember { mutableStateListOf<ZaznamKola>() }
     
-    // Nastavenia
     var hraBezi by remember { mutableStateOf(false) }
     var limitPrikladov by remember { mutableIntStateOf(5) }
     var hornaHranicaNasobilky by remember { mutableStateOf("10") }
+    var zvolenyJazyk by remember { mutableStateOf("Slovenčina") }
     
-    // Aktuálne kolo
     var cislo1 by remember { mutableIntStateOf(1) }
     var cislo2 by remember { mutableIntStateOf(1) }
     var vstupPouzivatela by remember { mutableStateOf("") }
@@ -63,7 +61,6 @@ fun MatematickyTrener() {
     var spravneOdpovede by remember { mutableIntStateOf(0) }
     val chybnePriklady = remember { mutableStateListOf<ChybnyPriklad>() }
     
-    // Čas
     var startTimeCelkovo by remember { mutableLongStateOf(0L) }
     var startTimePriklad by remember { mutableLongStateOf(0L) }
     var aktualneSekundy by remember { mutableIntStateOf(0) }
@@ -73,7 +70,6 @@ fun MatematickyTrener() {
     var farbaPozadia by remember { mutableStateOf(Color.Transparent) }
     val animovanaFarba by animateColorAsState(targetValue = farbaPozadia, label = "")
     val scope = rememberCoroutineScope()
-    var zvolenyJazyk by remember { mutableStateOf("Slovenčina") }
 
     fun generujPriklad() {
         val max = hornaHranicaNasobilky.toIntOrNull()?.coerceIn(1, 20) ?: 10
@@ -142,7 +138,6 @@ fun MatematickyTrener() {
                 Text("Tréner násobilky", fontSize = 32.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(20.dp))
                 
-                // Nastavenie rozsahu
                 Text("Násobilka od 1 do (max 20):")
                 OutlinedTextField(
                     value = hornaHranicaNasobilky,
@@ -163,11 +158,22 @@ fun MatematickyTrener() {
                 }
 
                 Spacer(Modifier.height(16.dp))
+                Text("Jazyk pre hlas:")
+                Row {
+                    listOf("Slovenčina", "Deutsch").forEach { jaz ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.selectable(jaz == zvolenyJazyk, onClick = { zvolenyJazyk = jaz }).padding(8.dp)) {
+                            RadioButton(jaz == zvolenyJazyk, null)
+                            Text(jaz)
+                        }
+                    }
+                }
+
                 if (historiaKol.isNotEmpty()) {
-                    Text("História dnešných kôl:", fontWeight = FontWeight.SemiBold)
-                    LazyColumn(modifier = Modifier.height(150.dp)) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("História kôl:", fontWeight = FontWeight.SemiBold)
+                    LazyColumn(modifier = Modifier.height(120.dp)) {
                         items(historiaKol.reversed()) { kolo ->
-                            Text("Kolo ${kolo.poradie}: ${kolo.spravne}/${kolo.celkovo} za ${"%.1f".format(kolo.casSekundy)}s", fontSize = 14.sp)
+                            Text("Kolo ${kolo.poradie}: ${kolo.spravne}/${kolo.celkovo} (${"%.1f".format(kolo.casSekundy)}s)", fontSize = 14.sp)
                         }
                     }
                 }
@@ -189,19 +195,27 @@ fun MatematickyTrener() {
         else -> {
             Column(modifier = Modifier.fillMaxSize().background(animovanaFarba).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Príklad ${pocetPrikladov + 1} / $limitPrikladov")
-                Text("Čas: $aktualneSekundy s", color = Color.Gray)
+                Text("Čas príkladu: $aktualneSekundy s", color = Color.Gray)
                 Spacer(Modifier.height(40.dp))
                 Text("$cislo1 × $cislo2 =", fontSize = 72.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(30.dp))
                 OutlinedTextField(
                     value = vstupPouzivatela,
                     onValueChange = { if (it.all { c -> c.isDigit() }) vstupPouzivatela = it },
-                    label = { Text("Odpoveď") },
+                    label = { Text(if (zvolenyJazyk == "Slovenčina") "Odpoveď" else "Antwort") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    trailingIcon = { IconButton(onClick = { /* Hlasový intent */ }) { Icon(Icons.Default.Mic, null) } }
+                    trailingIcon = { 
+                        IconButton(onClick = { 
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (zvolenyJazyk == "Slovenčina") "sk-SK" else "de-DE")
+                            }
+                            launcher.launch(intent)
+                        }) { Icon(Icons.Default.Mic, null) } 
+                    }
                 )
-                Button(onClick = { spracujOdpoved(vstupPouzivatela) }, modifier = Modifier.padding(top = 24.dp).fillMaxWidth().height(56.dp)) { Text("POTVRDIŤ") }
+                Button(onClick = { spracujOdpoved(vstupPouzivatela) }, modifier = Modifier.padding(top = 24.dp).fillMaxWidth().height(56.dp)) { Text(if (zvolenyJazyk == "Slovenčina") "POTVRDIŤ" else "BESTÄTIGEN") }
             }
         }
     }
@@ -209,23 +223,28 @@ fun MatematickyTrener() {
 
 @Composable
 fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyPriklad>, onRestart: () -> Unit) {
-    val priemer = if (celkovo > 0) (cas / 1000.0) / celkovo else 0.0
+    val celkoveSekundy = cas / 1000.0
+    val priemer = if (celkovo > 0) celkoveSekundy / celkovo else 0.0
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("📊 Výsledky kola", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text("📊 Výsledky", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
         Text("Úspešnosť: $spravne / $celkovo", fontSize = 22.sp)
-        Text("Priemer: ${"%.2f".format(priemer)} s / príklad", color = Color(0xFF1976D2))
+        Text("Celkový čas: ${"%.1f".format(celkoveSekundy)} s", fontSize = 18.sp)
+        Text("Priemer na príklad: ${"%.2f".format(priemer)} s", fontSize = 18.sp, color = Color(0xFF1976D2))
 
         if (chybne.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            Text("Oprava chýb:", color = Color.Red, fontWeight = FontWeight.Bold)
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(chybne) { ChybnyPrikladItem(it) }
+            Spacer(Modifier.height(16.dp))
+            Text("Oprava chýb:", fontWeight = FontWeight.Bold, color = Color.Red)
+            LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                items(chybne) { priklad -> ChybnyPrikladItem(priklad) }
             }
         } else {
             Spacer(Modifier.weight(1f))
-            Text("Perfektné! 🏆", fontSize = 30.sp, color = Color(0xFF388E3C))
+            Text("Všetko správne! 🎉", fontSize = 24.sp, color = Color(0xFF388E3C), fontWeight = FontWeight.Bold)
         }
-        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth()) { Text("SPÄŤ DO MENU") }
+
+        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("SPÄŤ DO MENU") }
     }
 }
 
@@ -233,14 +252,14 @@ fun StatistikaScreen(spravne: Int, celkovo: Int, cas: Long, chybne: List<ChybnyP
 fun ChybnyPrikladItem(priklad: ChybnyPriklad) {
     var opravaVstup by remember { mutableStateOf("") }
     var opravene by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth().padding(4.dp), colors = CardDefaults.cardColors(containerColor = if (opravene) Color(0xFFE8F5E9) else Color(0xFFFFF3F3))) {
-        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${priklad.c1} × ${priklad.c2} =", modifier = Modifier.width(80.dp))
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = if (opravene) Color(0xFFE8F5E9) else Color(0xFFFFF3F3))) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("${priklad.c1} × ${priklad.c2} =", modifier = Modifier.width(100.dp), fontSize = 18.sp)
             if (!opravene) {
                 OutlinedTextField(value = opravaVstup, onValueChange = { if (it.all { c -> c.isDigit() }) opravaVstup = it }, modifier = Modifier.width(80.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
                 IconButton(onClick = { if (opravaVstup.toIntOrNull() == priklad.c1 * priklad.c2) opravene = true }) { Icon(Icons.Default.CheckCircle, null, tint = Color.Gray) }
             } else {
-                Text("${priklad.c1 * priklad.c2}", fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
+                Text("${priklad.c1 * priklad.c2}", fontWeight = FontWeight.Bold, color = Color(0xFF388E3C), fontSize = 18.sp)
                 Spacer(Modifier.weight(1f))
                 Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF388E3C))
             }
