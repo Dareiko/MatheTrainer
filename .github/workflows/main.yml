@@ -2,16 +2,21 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ] # Spustí sa vždy, keď uložíš kód
+    branches: [ "main" ]
+
+env:
+  # Týmto povieme GitHubu, aby okamžite použil Node.js 24
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5 # Aktualizované na v5
 
-      - name: set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5 # Aktualizované na v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -19,7 +24,6 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-        # Ak gradlew nemáš, skúsime build priamo cez gradle
 
       - name: Build with Gradle
         run: ./gradlew assembleDebug
