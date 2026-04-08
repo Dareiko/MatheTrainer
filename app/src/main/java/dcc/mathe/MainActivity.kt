@@ -166,9 +166,8 @@ fun MatematickyTrener() {
             ModalDrawerSheet {
                 Spacer(Modifier.height(12.dp))
                 Text("Mathe Trainer Menu", modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
-                HorizontalDivider()
+                Divider() // Opravené z HorizontalDivider
                 
-                // 1. Pauza / Pokračovať
                 if (hraBezi && !zobrazVysledok) {
                     NavigationDrawerItem(
                         icon = { Icon(if (jePauza) Icons.Default.PlayArrow else Icons.Default.Pause, null) },
@@ -178,7 +177,6 @@ fun MatematickyTrener() {
                     )
                 }
 
-                // 2. Jazyk
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Language, null) },
                     label = { Text("Slovenčina / Deutsch") },
@@ -186,7 +184,6 @@ fun MatematickyTrener() {
                     onClick = { zvolenyJazyk = if (zvolenyJazyk == "Slovenčina") "Deutsch" else "Slovenčina" }
                 )
 
-                // 3. Štatistiky (Návrat do menu)
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.BarChart, null) },
                     label = { Text(t["stats"]!!) },
@@ -195,9 +192,8 @@ fun MatematickyTrener() {
                 )
 
                 Spacer(Modifier.weight(1f))
-                HorizontalDivider()
+                Divider() // Opravené z HorizontalDivider
                 
-                // 4. Koniec
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.ExitToApp, null) },
                     label = { Text(t["exit"]!!) },
