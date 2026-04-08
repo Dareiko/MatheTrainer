@@ -125,12 +125,12 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
             "title" to "Mathe Trainer", "start" to "ŠTART", "history" to "História",
             "example" to "Príklad", "results" to "📊 Výsledky", "success" to "Úspešnosť",
             "menu" to "MENU", "exit" to "Koniec", "limitX" to "Násobilka do:", "limitP" to "Počet príkladov:",
-            "count" to "Počet", "time" to "Čas (Priem.)"
+            "count" to "Počet", "time" to "Čas (Priem.)", "none" to "Žiadne záznamy"
         ) else mapOf(
             "title" to "Mathe Trainer", "start" to "START", "history" to "Verlauf",
             "example" to "Aufgabe", "results" to "📊 Ergebnisse", "success" to "Erfolg",
             "menu" to "MENÜ", "exit" to "Ende", "limitX" to "Einmaleins bis:", "limitP" to "Anzahl:",
-            "count" to "Anzahl", "time" to "Zeit (Schnitt)"
+            "count" to "Anzahl", "time" to "Zeit (Schnitt)", "none" to "Keine Daten"
         )
     }
 
@@ -148,10 +148,9 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
     var bgFarba by remember { mutableStateOf(Color.Transparent) }
     val animBg by animateColorAsState(bgFarba, label = "bg")
 
-    // --- LOGIKA GENERÁTORA ---
     val generuj = {
         val max = typX.toIntOrNull() ?: 10
-        fun dajVazeneCislo(l: Int): Int {
+        fun dajV(l: Int): Int {
             val ls = mutableListOf<Int>()
             for (i in 1..l) {
                 val v = when(i) { 1 -> 1; 2, 5, 10 -> 2; in 6..9 -> 4; else -> 3 }
@@ -159,14 +158,8 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
             }
             return ls.random()
         }
-        // Aplikujeme váhy na OBA čísla
-        var a = dajVazeneCislo(max)
-        var b = dajVazeneCislo(max)
-        
-        // Anti-low poistka pre celú rovnicu
-        if (a < 3 && b < 3) {
-            if ((0..1).random() == 0) a = (3..max).random() else b = (3..max).random()
-        }
+        var a = dajV(max); var b = dajV(max)
+        if (a < 3 && b < 3) { if ((0..1).random() == 0) a = (3..max).random() else b = (3..max).random() }
         n1 = a; n2 = b
     }
 
@@ -215,14 +208,16 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         drawerContent = {
             ModalDrawerSheet(modifier = Modifier.fillMaxWidth(0.85f)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text(t["history"]!!, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text(t["history"] ?: "História", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     TrendovyGraf(historiaKol, isSystemInDarkTheme() || themeMode == "dark")
                     
                     if (historiaKol.isNotEmpty()) {
                         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp)) {
-                            listOf("Typ" to 0.8f, t["count"]!! to 0.8f, t["time"]!! to 1.6f, "%" to 0.7f, "OK" to 0.6f).forEach { (txt, w) ->
-                                Text(txt, Modifier.weight(w), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-                            }
+                            Text("Typ", Modifier.weight(0.8f), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                            Text(t["count"]!!, Modifier.weight(0.8f), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                            Text(t["time"]!!, Modifier.weight(1.6f), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                            Text("%", Modifier.weight(0.7f), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                            Text("OK", Modifier.weight(0.6f), fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
                         }
                         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                             items(historiaKol.reversed(), key = { it.id }) { k ->
@@ -238,7 +233,7 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                             }
                         }
                     } else {
-                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text("Žiadne záznamy", alpha = 0.5f) }
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(t["none"]!!, modifier = Modifier.alpha(0.5f)) }
                     }
                     
                     Divider(Modifier.padding(vertical = 8.dp))
@@ -266,7 +261,11 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
         ) { p ->
             Box(Modifier.fillMaxSize().padding(p)) {
                 when {
-                    !hraBezi -> Column(Modifier.fillMaxSize().padding(16.dp), Alignment.CenterHorizontally, Arrangement.Center) {
+                    !hraBezi -> Column(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         var exX by remember { mutableStateOf(false) }
                         var exP by remember { mutableStateOf(false) }
 
@@ -288,12 +287,20 @@ fun MatematickyTrener(themeMode: String, onThemeToggle: (String) -> Unit) {
                         Spacer(Modifier.height(32.dp))
                         Button({ startT = System.currentTimeMillis(); sekundy = 0; body = 0; aktualnyIndex = 0; hraBezi = true; generuj() }, Modifier.fillMaxWidth().height(60.dp)) { Text(t["start"]!!, fontSize = 18.sp) }
                     }
-                    zobrazVysledok -> Column(Modifier.fillMaxSize().padding(20.dp), Alignment.CenterHorizontally, Arrangement.Center) {
+                    zobrazVysledok -> Column(
+                        modifier = Modifier.fillMaxSize().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Text(t["results"]!!, fontSize = 32.sp, fontWeight = FontWeight.Bold)
                         Text("${t["success"]!!}: $body / $limit", fontSize = 24.sp)
                         Button({ hraBezi = false; zobrazVysledok = false }, Modifier.padding(top = 32.dp).fillMaxWidth().height(56.dp)) { Text(t["menu"]!!) }
                     }
-                    else -> Column(Modifier.fillMaxSize().background(animBg).padding(20.dp), Alignment.CenterHorizontally) {
+                    else -> Column(
+                        modifier = Modifier.fillMaxSize().background(animBg).padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top
+                    ) {
                         val prog = (aktualnyIndex.toFloat() / limit)
                         LinearProgressIndicator(progress = prog, modifier = Modifier.fillMaxWidth().height(8.dp))
                         Spacer(Modifier.height(8.dp))
